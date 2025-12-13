@@ -32,23 +32,31 @@ def root():
 def get_posts(page: int=None, page_size: int=5, db: Session = Depends(get_db)):
     total_no_posts = Posts.get_posts_count(db)
     
-    if page == None:
+    if page is None:
         page = 1
         
-    start = (page - 1) * page_size
-    end = start + page_size
+    total_pages = (total_no_posts + page_size - 1) // page_size
     
-    if start >= total_no_posts:
+    if page < 1 or page > total_pages:
+        # A 400 Bad Request might be better than 404 for an invalid page number
+        # but matching your original logic:
         return HTTPException(status_code=404, detail="Page not found")
+        
+    # 3. Determine the slice for the *most recent* posts
+    # The start/end calculated here represent the *position* in the sorted list (latest first)
+    offset = (page - 1) * page_size
+    limit = page_size
     
-    if end > total_no_posts:
-        end = total_no_posts
+    # We will fetch posts starting from the post at 'offset' position, up to 'limit' posts.
     
-    all_posts = Posts.get_posts_between_ids(db, start+1, end+1)
+    # 4. Fetch the posts with ORDER BY ID DESC
+    all_posts = Posts.get_latest_posts_with_pagination(db, offset, limit)
+    
+    # Optional: If the post object needs extra data loaded (like its original load_artifacts call)
     for post in all_posts:
         Posts.load_artifacts(post)    
     
-    return {"no_of_posts": total_no_posts, "posts": all_posts}
+    return {"no_of_posts": total_no_posts, "posts": all_posts, "current_page": page, "total_pages": total_pages}
 
 @app.get("/posts/{public_id}")
 def get_post(public_id: uuid.UUID, db: Session = Depends(get_db)) -> PostResponse:

@@ -11,8 +11,18 @@ def get_posts_count(db: Session) -> int:
 def get_post_by_id(db: Session, public_id: int):
     return db.query(Post).options(joinedload(Post.artifacts)).filter(Post.public_id == public_id).first()
 
-def get_posts_between_ids(db: Session, start_id: int, end_id: int):
-    return db.query(Post).options(joinedload(Post.artifacts)).filter(Post.id.between(start_id, end_id)).all()
+def get_latest_posts_with_pagination(db: Session, offset: int, limit: int):
+    """
+    Fetches posts, ordered by ID descending (newest first), with pagination.
+    """
+    return (
+        db.query(Post)
+        .options(joinedload(Post.artifacts))
+        .order_by(Post.id.desc())
+        .offset(offset)            
+        .limit(limit)
+        .all()
+    )
 
 def create_post(db: Session, title: str, content: str):
     post = Post(title=title, content=content)
